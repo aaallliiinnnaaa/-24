@@ -1,7 +1,10 @@
-присвоение имен: 
+1. присвоение имен: 
  hostnametl set-hostname <имя>
  newgrp 
 
 для айпи: 
  apt install network-manager (nmtui)
 
+айпи в разделе сеть
+
+2. frr

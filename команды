@@ -8,3 +8,135 @@
 айпи в разделе сеть
 
 2. frr
+обоснование: OSPF подходит для построения средних по размеру сетей, 
+и при этом является открытым стандартом протоколов динамической маршрутизации, в то время как 
+EIGRP проприетарный протокол CISCO IOS, IS-IS и BGP используются для глобальной маршрутизации на уровне провайдеров.
+
+установка: 
+apt install frr 
+nano /etc/frr/daemons (изменение параметров на yes)
+systemctl restart frr 
+
+настройка:
+vtysh 
+Conf t
+Router ospf
+Ospf router-id 1.1.1.1|2.2.2.2|3.3.3.3
+HQ – Network 192.168.10.3/30 area 0  
+HQ – Network 192.168.2.0/29 area 1 
+ISP – network 192.168.10.3/30 area 0 
+ISP – network 192.168.1.0/24 area 2 
+ISP – network 192.168.10.3/30 area 0 
+BR – network 192.168.10.3/30 area 0
+BR – network 192.168.3.0/27 area 3
+Ex
+Ex
+Write
+Ex
+Nano /etc/sysctl.conf
+переменную net.ipv4.ip_forward=1 необходимо раскоментить и сохранить изменения в файле, 
+и применить изменения командой sysctl -p
+Так же и с 6 net.ipv6.conf.all.forwarding=1
+ 
+Router ospf6
+Ospf6 router-id 0.0.0.1|0.0.0.2|0.0.0.3
+HQ – Area 0.0.0.0 range 2001::10:0/126
+HQ – Area 0.0.0.0 range 2001::2:0/125
+ISP – area 0.0.0.0 range 2001::10:0/126
+ISP – area 0.0.0.0 range 2001::1:0/120
+BR – area 0.0.0.0 range 2001::10:0/126
+BR – area 0.0.0.0 range 2001::3:0/123
+Ex
+Ex
+Write
+Ex
+
+Нужно еще сделать один момент для работы ipv6:
+Прописываем interface ens224*
+	ipv6 ospf6 area 0.0.0.0
+	ex
+	!
+	interface ens256*
+И так на каждый интерфейс.
+
+3. DHCP
+Настройка DHCP
+nano /etc/default/isc-dhcp-server
+Interfacesv4="ens* ens*"
+Interfacesv6="ens* ens*"
+
+nano /etc/dhcp/dhcpd.conf
+default-lease-time 600;
+max-lease-time 7200;
+#ddns-updates on;
+#ddns-update-style interim;
+autoritative;
+
+nano /etc/default/isc-dhcp-server
+раскомментить все v4 и если по задание необходимо и v6
+изменить так же нужно: DHCPv4_PID=/var/run/dhclient.ens192.pid(192 если этот int интернет)
+
+subnet 192.168.2.0 netmask 255.255.255.248 {
+ range 192.168.2.3 192.168.2.6;
+ option routers 192.168.2.1;
+# option domain-name "hq.work";
+# option domain-name-servers 192.168.2.2;
+}
+
+после каждого изменения конфигурации необходимо перезагружать DHCP сервер для применения конфигурации
+systemctl stop isc-dhcp-server
+systemctl start isc-dhcp-server
+А для того, чтобы после перезагрузки DHCP-сервер автоматически включался можно воспользоваться командой 
+systemctl enable isc-dhcp-server
+v6
+nano /etc/dhcp/dhcpd6.conf
+default-lease-time 2592000;
+preferred-lifetime 604800;
+option dhcp-renewal-time 3600;
+option dhcp-rebinding-time 7200;
+allow leasequery;
+
+subnet6 2001::2:0/125 {
+	range6 2001::2:3 2001::2:3e;
+option dhcp6.name-servers 2001::2:2;
+option dhcp6.domain-search "hq.work";
+}
+option dhcp6.info-refresh-time 21600;
+autoritative;
+
+
+radvd
+После установки нужно сконфигурировать файл по пути /etc/radvd.conf следующего содержания
+interface ens* (в сторону сервера, клиента)
+{
+MinRtrAdvInterval 3;
+MaxRtrAdvInterval 60;
+AdvSendAdvert on;
+};
+После окончания конфигурирования так же необходимо перезагрузить службу Radvd и отправить в Enable
+systemctl stop radvd
+systemctl start radvd
+systemctl enable radvd
+
+4. учетки 
+adduser <имя>
+visudo для прав 
+cli: admin
+hq-srv: admin
+hq-r: network admin, admin
+br-srv: branchadmin, network admin
+br-r: branchadmin, network admin
+
+5. iperf3
+на hq-r и isp
+apt install iperf3 
+выбрать yes
+на hq-r iperf3 -c 192.168.10.1 -i1 -t20
+на isp iperf3 -c 192.168.10.2 -i1 -t20
+прикрепить скрин 
+
+6. backup
+на HQ-R, BR-R 
+mkdir /mnt/backup
+touch /etc/backup.sh
+nano /etc/backup.sh

@@ -1,0 +1,7 @@
+присвоение имен: 
+ hostnametl set-hostname <имя>
+ newgrp 
+
+для айпи: 
+ apt install network-manager (nmtui)
+

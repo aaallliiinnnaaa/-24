@@ -1,7 +1,7 @@
 1. присвоение имен: 
  hostnametl set-hostname <имя>
  newgrp 
-
+вместо 27 28,123-124
 для айпи: 
  apt install network-manager (nmtui)
 
